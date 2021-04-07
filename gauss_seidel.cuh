@@ -1,3 +1,5 @@
+#include "definitions.cuh"
+
 __global__ void gauss_seidel_kernel(double *u, const double *f, const int n, const int color) {
 
         int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -29,3 +31,21 @@ void gauss_seidel_H(double *u, const double *f, const int n) {
 
 }
 
+
+template <typename Number=double>
+class GaussSeidelCU {
+        private:
+                Number *u;
+                const Number *f;
+                int n;
+
+        public:
+         GaussSeidelCU(Number *u, const Number *f, const int n)
+             : u(u), f(f), n(n) {}
+
+         void operator()(void) {
+                gauss_seidel_H(u, f, n);
+         }
+
+         const char* name(void) {return "Gauss-Seidel (CUDA)";}
+};

@@ -38,7 +38,7 @@ __global__ void l1norm_kernel(double *temp, const double *u, const double h, con
 }
 
 
-double l1norm_H(double *tmp, double *u, const int n, const double h, int device=0) {
+double l1norm_H(double *tmp, const double *u, const int n, const double h, int device=0) {
 
         double out[1] = {0.0};
 
@@ -55,4 +55,26 @@ double l1norm_H(double *tmp, double *u, const int n, const double h, int device=
         return out[0];
 
 }
+
+template <typename Number=double>
+class L1NormCU {
+        private:
+                const Number *u;
+                const int n;
+                const Number h;
+                Number *sum;
+        public:
+                L1NormCU(const Number *u, const int n, const Number h) : u(u), n(n), h(h) {
+                        cudaMalloc((void**)&sum, sizeof(Number));
+                }
+
+                Number operator()(void) {
+                        return l1norm_H(sum, u, n, h);
+                }
+
+                ~L1NormCU() {
+                        cudaFree(sum);
+                }
+
+};
 

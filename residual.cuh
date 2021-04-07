@@ -25,3 +25,19 @@ void residual_H(double *res, const double *u, const double *f, const int n) {
 
 }
 
+template <typename Number=double>
+class ResidualCU {
+
+        private:
+                Number *res;
+                const Number *u, *f;
+                const int n;
+
+        public:
+                ResidualCU(Number *res, const Number *u, const Number *f, const int n)
+             : res(res), u(u), f(f), n(n) {}
+
+                void operator()(void){
+                       residual_H(res, u, f, n); 
+                }
+};

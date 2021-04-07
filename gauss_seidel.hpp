@@ -1,4 +1,7 @@
-void gauss_seidel(double *u, const double *f, const int n) {
+#pragma once
+
+template <typename Number=double>
+void gauss_seidel(Number *u, const Number *f, const int n) {
 
         for (int i = 1; i < n - 1; ++i) {
                 for (int j = 1; j < n - 1; ++j) {
@@ -25,3 +28,22 @@ void gauss_seidel(double *u, const double *f, const int n) {
         }
 
 }
+
+template <typename Number=double>
+class GaussSeidel {
+        private:
+                Number *u;
+                const Number *f;
+                int n;
+
+        public:
+         GaussSeidel(Number *u, const Number *f, const int n)
+             : u(u), f(f), n(n) {}
+
+         void operator()(void) {
+                gauss_seidel(this->u, this->f, this->n);
+         }
+
+         const char* name(void) {return "Gauss-Seidel";}
+};
+
