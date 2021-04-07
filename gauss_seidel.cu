@@ -3,15 +3,14 @@
 #include <math.h>
 #include <cuda.h>
 #include <assert.h>
+#include <chrono>
 
+#include "definitions.hpp"
 #include "mms.hpp"
 #include "residual.hpp"
 #include "norm.hpp"
 #include "gauss_seidel.hpp"
 #include "solver.hpp"
-
-#define USE_CPU 1
-#define USE_GPU 1
 
 #if USE_GPU
 #include "gauss_seidel.cuh"
@@ -19,12 +18,13 @@
 #include "norm.cuh"
 #endif
 
+
 int main(int argc, char **argv) {
 
         using Number=double;
 
         int stride = 100;
-        int n = 1 << 8;
+        int n = 1 << 10;
         int max_iter = 1000;
         double eps = 1e-12;
         size_t num_bytes = n * n * sizeof(double);
@@ -58,7 +58,11 @@ int main(int argc, char **argv) {
         Residual<Number> res(r, u, f, n);
         L1Norm<Number> norm(r, n, h);
         
+        auto t1 = std::chrono::high_resolution_clock::now();
         solve(gs, res, norm, fnorm, max_iter, eps, stride);
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double,std::milli> elapsed = t2 - t1;
+        printf("Solver took: %g ms\n", elapsed.count());
 
         printf("Checking solution...\n");
         exact_solution(r, n,  h);
