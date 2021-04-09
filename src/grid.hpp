@@ -87,7 +87,7 @@ template <typename T>
 void grid_print(const T *x, const int nx, const int ny) {
         for (int i = 0; i < ny; ++i) {
                 for (int j = 0; j < nx; ++j)
-                        printf("%f ", x[j + i * nx]);
+                        printf("%-5.3g ", fabs(x[j + i * nx]));
                 printf("\n");
         }
 }

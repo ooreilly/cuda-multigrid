@@ -83,13 +83,94 @@ void convergence_test(const int num_grids) {
 
 }
 
+template <typename T, typename F>
+SolverOutput test_multigrid(const int l, SolverOptions opts) {
+        int n = (1 << l) + 1;
+        printf("Problem size: %d x %d \n", n, n);
+        size_t num_bytes = sizeof(T) * n * n;
+        T modes = 1.0;
+        T h = 1.0 / (n - 1);
+        T *u = (T*)malloc(num_bytes);
+        T *f = (T*)malloc(num_bytes);
+        T *r = (T*)malloc(num_bytes);
+        memset(u, 0, num_bytes);
+        memset(f, 0, num_bytes);
+        memset(r, 0, num_bytes);
+
+        forcing_function(f, n, h, modes);
+        T fnorm = grid_l1norm(f, n, n, h) * h * h; 
+        Multigrid<T> mg(l);
+
+        F solver;
+
+        //forcing_function(u, n, h, modes);
+
+        //printf("f \n");
+        //grid_print(f, n, n);
+
+        if (opts.verbose) {
+                printf("Solver: %s \n", solver.name());
+                printf("h^2|f|_1 = %g, eps = %g, eps h^2|f|_1 = %g \n", fnorm, opts.eps, opts.eps * fnorm);
+                printf("Iteration \t Residual\n");
+        }
+        
+        T res = 0.0;
+        int iter = 0;
+        do {
+                mg(solver, u, f, h);
+                residual(r, u, f, n, h);
+                res = grid_l1norm(r, n, n, h);
+                iter++;
+                if (iter % opts.info == 0 && opts.verbose)
+                printf("%-7d \t %-7.7g \n", iter, res);
+
+        } while (res > opts.eps * fnorm && (iter < opts.max_iterations || opts.max_iterations < 0));
+
+        SolverOutput out;
+        out.iterations = iter;
+        out.residual = res;
+
+        if (opts.mms) {
+                T *v = (T*)malloc(num_bytes);
+                memset(v, 0, num_bytes);
+                exact_solution(v, n, h, modes);
+                grid_subtract(r, u, v, n, n);
+                out.error = grid_l1norm(r, n, n, h);
+                free(v);
+        }
+
+        free(u);
+        free(f);
+        free(r);
+
+        return out;
+
+}
+
 int main(int argc, char **argv) {
 
         SolverOptions opts;
-        test_gauss_seidel<double, GaussSeidel>(100, 1.0, 1.0, opts);
-        test_gauss_seidel<double, GaussSeidelRedBlack>(100, 1.0, 1.0, opts);
+        opts.verbose = 1;
+        opts.info = 100;
+        opts.max_iterations = 10000;
+        opts.eps = 1e-4;
+        int l = 8;
+        int n = (1 << l) + 1;
+        double h = 1.0 / (n - 1);
+        //{
+        //auto out = test_gauss_seidel<double, GaussSeidelRedBlack>(n, h, 1.0,  opts);
+        //printf("Iterations: %d \n", out.iterations);
+        //}
+
+        //{
+        //auto out = test_multigrid<double, GaussSeidel>(l, opts);
+        //printf("Iterations: %d \n", out.iterations);
+        //}
+        //test_gauss_seidel<double, GaussSeidel>((1 << 5) + 1, 1.0, 1.0, opts);
+        //test_gauss_seidel<double, GaussSeidel>(100, 1.0, 1.0, opts);
+        //test_gauss_seidel<double, GaussSeidelRedBlack>(100, 1.0, 1.0, opts);
 
         convergence_test<double, GaussSeidel>(3);
-        convergence_test<double, GaussSeidelRedBlack>(3);
+        //convergence_test<double, GaussSeidelRedBlack>(3);
 
 }

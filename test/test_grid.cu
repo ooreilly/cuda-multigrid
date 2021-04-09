@@ -36,7 +36,7 @@ int test_gridpoints(const int nx, const int ny, const T h) {
 template <typename T>
 void restriction(const char *axis, const T *xc, T *yc, T *zc, const int nxc,
                  const int nyc, const T hc, const T *xf, const int nxf, const int nyf, const T hf) {
-        grid_restrict(yc, nxc, nyc, xf, nxf, nyf, 1.0);
+        grid_restrict(yc, nxc, nyc, xf, nxf, nyf);
         grid_subtract(zc, xc, yc, nxc, nyc);
 
         T l1_err = grid_l1norm(zc, nxc, nyc, hc);
