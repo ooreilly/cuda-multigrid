@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
         opts.max_iterations = 20;//e4;
         opts.eps = 1e-8;
         opts.mms = 1;
-        int l = 10;
+        int l = 4;
         int n = (1 << l) + 1;
         double h = 1.0 / (n - 1);
         double modes = 1.0;

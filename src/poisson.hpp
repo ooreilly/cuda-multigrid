@@ -98,7 +98,7 @@ __inline__ void base_case(T *u, const T *f, const T h) {
 }
 
 template <typename T, typename S>
-void multigrid_v_cycle(const int l, S& smoother, T *u, T *f, T *r, T *tmp, T **v, const T h) {
+void multigrid_v_cycle(const int l, S& smoother, T *u, T *f, T *r, T *v, T *w, const T h) {
 
         if (l == 1) {
                 base_case(u, f, h);
@@ -107,66 +107,63 @@ void multigrid_v_cycle(const int l, S& smoother, T *u, T *f, T *r, T *tmp, T **v
 
         int nu = (1 << l) + 1; 
         int nv = (1 << (l - 1)) + 1;
-        T *d = (T*)malloc(sizeof(T) * nv * nv);
-        T *vl = (T*)malloc(sizeof(T) * nv * nv);
-        memset(vl, 0, sizeof(T) * nv * nv);
-        memset(d, 0, sizeof(T) * nv * nv);
+        // Get e^(l-1) and residual r^(l-1)
+        T *el = &v[nv * nv];
+        T *rl = &w[nv * nv];
 
         smoother(u, f, nu, h);
 
-        memset(tmp, 0, sizeof(T) * nu * nu);
-        poisson_residual(tmp, u, f, nu, h);
+        // r^l := f - Lu^l
+        poisson_residual(r, u, f, nu, h);
 
-        grid_restrict(d, nv, nv, tmp, nu, nu, 0.0, 1.0);
+        // r^(l-1) := R * r 
+        grid_restrict(rl, nv, nv, r, nu, nu, 0.0, 1.0);
 
-        multigrid_v_cycle(l - 1, smoother, vl, d, r, tmp, v, 2 * h); 
+        // Solve: A^(l-1) e^(l-1) = r^(l-1)
+        multigrid_v_cycle(l - 1, smoother, el, rl, r, v, w, 2 * h); 
 
-        // Prolongate and add correction u^l = u^l +  Pv^(l-1)
-        grid_prolongate(u, nu, nu, vl, nv, nv, 1.0, 1.0);
+        // Prolongate and add correction u^l := u^l +  Pe^(l-1)
+        grid_prolongate(u, nu, nu, el, nv, nv, 1.0, 1.0);
 
         smoother(u, f, nu, h);
-
-        free(d);
-        free(vl);
-
-
 }
 
 template <typename F, typename P, typename T>
 class Multigrid {
         private:
-                T **v, *r, *tmp;
+                // v and w are buffers of size (l + 1) * log (l + 1), 
+                // v[0] .. v[l] (one per grid)
+                // v is used for the initial guess and w is used for the restricted residual
+                T *v = 0, *w = 0, *r = 0;
                 int l;
+                size_t num_bytes = 0;
                 F smoother;
         public:
 
                 Multigrid() { }
                 Multigrid(P& p) : l(p.l) {
-                        // v[0] : fine grid, v[n-1] : coarse grid
-                        //v = (T**)malloc(sizeof(T) * p.l);
-                        //for (int i = 0; i < l; ++i) {
-                        //        int n = (1 << (p.l - 0)) + 1;
-                        //        int num_bytes =  sizeof(T) * p.n * p.n;
-                        //        v[i] = (T*)malloc(num_bytes);
-                        //        memset(v[i], 0, num_bytes);
-                        //}
+                        for (int i = 0; i <= l; ++i) {
+                                int n = (1 << i) + 1;
+                                num_bytes +=sizeof(T) * n * n;
+                        }
+                        v = (T*)malloc(num_bytes);
+                        w = (T*)malloc(num_bytes);
 
                         int n = (1 << p.l) + 1;
                         r = (T*)malloc(sizeof(T) * n * n);
-                        tmp = (T*)malloc(sizeof(T) * n * n);
 
                 }
 
                 void operator()(P& p) {
-                        multigrid_v_cycle<T, F>(p.l, smoother, p.u, p.f, r, tmp, v, p.h);
+                        memset(v, 0, num_bytes);
+                        memset(w, 0, num_bytes);
+                        multigrid_v_cycle<T, F>(l, smoother, p.u, p.f, r, v, w, p.h);
                 }
 
                 ~Multigrid(void) {
-                        //for (int i = 0; i < l; ++i) 
-                        //        free(v[i]);
-                        //        free(v);
-                        free(r);
-                        free(tmp);
+                        if (v != nullptr) free(v);
+                        if (w != nullptr) free(w);
+                        if (r != nullptr) free(r);
                 }
 
                 const char *name() {

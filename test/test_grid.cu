@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
         {
                 int nxc = 4;
                 int nyc = 4;
-                double hf = 1.0;
+                double hf = 0.3;
                 err |= test_restriction_prolongation(nxc, nyc, hf);
         }
 
