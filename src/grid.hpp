@@ -22,10 +22,25 @@ void grid_y(T *y, const int nx, const int ny, const T h) {
 template<typename T>
 void grid_restrict(T *yc, const int nxc, const int nyc, const T *xf, const int nxf, const int nyf, const T a = 0.0, const T b=1.0) {
         assert(nxf == 2 * (nxc - 1) + 1);
-        for (int i = 0; i < nyc; ++i) {
-                for (int j = 0; j < nxc; ++j) {
+        const T c0 = 0.25;
+        const T c1 = 0.5;
+        for (int i = 1; i < nyc-1; ++i) {
+                for (int j = 1; j < nxc-1; ++j) {
                         yc[j + nxc * i] =
-                            a * yc[j + nxc * i] + b * xf[2 * j + nxf * 2 * i];
+                            a * yc[j + nxc * i] + b *
+                            (
+                            c0 * c0 * xf[2 * j - 1 + nxf * (2 * i - 1)] +
+                            c0 * c1 * xf[2 * j     + nxf * (2 * i - 1)] +
+                            c0 * c0 * xf[2 * j + 1 + nxf * (2 * i - 1)] +
+                            +
+                            c1 * c0 * xf[2 * j - 1 + nxf * (2 * i + 0)] +
+                            c1 * c1 * xf[2 * j     + nxf * (2 * i + 0)] +
+                            c1 * c0 * xf[2 * j + 1 + nxf * (2 * i + 0)] +
+                            +
+                            c0 * c0 * xf[2 * j - 1 + nxf * (2 * i + 1)] +
+                            c0 * c1 * xf[2 * j     + nxf * (2 * i + 1)] +
+                            c0 * c0 * xf[2 * j + 1 + nxf * (2 * i + 1)]
+                            );
                 }
         }
 }
@@ -68,18 +83,24 @@ void grid_subtract(T *z, const T *x, const T *y, const int nx, const int ny) {
 }
 
 template<typename T>
-double grid_l1norm(const T *x, const int nx, const int ny, const T h) {
+double grid_l1norm(const T *x, const int nx, const int ny, const T h, const int bx=0, const int ex=-1, const int by=0, const int ey=-1) {
+        int enx = ex == -1 ? nx : ex;
+        int eny = ey == -1 ? ny : ey;
         double out = 0.0;
-        for (int i = 0; i < nx * ny; ++i) 
-                out += fabs(x[i]) * h * h;
+        for (int i = by; i < eny; ++i) 
+                for (int j = bx; j < enx; ++j) 
+                        out += fabs(x[j + nx * i]) * h * h;
         return out;
 }
 
 template<typename T>
-double grid_l2norm(const T *x, const int nx, const int ny, const T h) {
+double grid_l2norm(const T *x, const int nx, const int ny, const T h, const int bx=0, const int ex=-1, const int by=0, const int ey=-1) {
+        int enx = ex == -1 ? nx : ex;
+        int eny = ey == -1 ? ny : ey;
         double out = 0.0;
-        for (int i = 0; i < nx * ny; ++i) 
-                out += x[i] * x[i] * h * h;
+        for (int i = by; i < eny; ++i) 
+                for (int j = bx; j < enx; ++j) 
+                        out += fabs(x[j + nx * i]) * h * h;
         return out;
 }
 
@@ -87,7 +108,7 @@ template <typename T>
 void grid_print(const T *x, const int nx, const int ny) {
         for (int i = 0; i < ny; ++i) {
                 for (int j = 0; j < nx; ++j)
-                        printf("%-5.3g ", fabs(x[j + i * nx]));
+                        printf("%-5.3g ", x[j + i * nx]);
                 printf("\n");
         }
 }

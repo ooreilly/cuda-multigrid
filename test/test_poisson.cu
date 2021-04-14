@@ -3,174 +3,71 @@
 #include <poisson.hpp>
 #include <assertions.hpp>
 #include <grid.hpp>
+#include <solver.hpp>
 
-template <typename T, typename F>
-SolverOutput test_gauss_seidel(const int n, const T h, const T modes, SolverOptions opts) {
-        size_t num_bytes = sizeof(T) * n * n;
-        T *u = (T*)malloc(num_bytes);
-        T *f = (T*)malloc(num_bytes);
-        T *r = (T*)malloc(num_bytes);
-        memset(u, 0, num_bytes);
-        memset(f, 0, num_bytes);
-        memset(r, 0, num_bytes);
 
-        forcing_function(f, n, h, modes);
-        T fnorm = grid_l1norm(f, n, n, h); 
-
-        F solver;
-
-        if (opts.verbose) {
-                printf("Solver: %s \n", solver.name());
-                printf("|f|_1 = %g, eps = %g, eps|f|_1 = %g \n", fnorm, opts.eps, opts.eps * fnorm);
-                printf("Iteration \t Residual\n");
-        }
-        
-        T res = 0.0;
-        int iter = 0;
-        do {
-                solver(u, f, n, h);
-                residual(r, u, f, n, h);
-                res = grid_l1norm(r, n, n, h);
-                iter++;
-                if (iter % opts.info == 0 && opts.verbose)
-                printf("%-7d \t %-7.7g \n", iter, res);
-
-        } while (res > opts.eps * fnorm && (iter < opts.max_iterations || opts.max_iterations < 0));
-
-        SolverOutput out;
-        out.iterations = iter;
-        out.residual = res;
-
-        if (opts.mms) {
-                T *v = (T*)malloc(num_bytes);
-                memset(v, 0, num_bytes);
-                exact_solution(v, n, h, modes);
-                grid_subtract(r, u, v, n, n);
-                out.error = grid_l1norm(r, n, n, h);
-                free(v);
-        }
-
-        free(u);
-        free(f);
-        free(r);
-
-        return out;
-}
-
-template <typename T, typename F>
-void convergence_test(const int num_grids) {
-        int n = 16;
-        T h = 1.0;
-        T modes = 1.0;
+template <typename S, typename P, typename T=double>
+void convergence_test(const int num_grids, SolverOptions opts) {
         T rate = 0.0;
         T err1 = 0.0;
-        F solver;
-        printf("Solver: %s \n", solver.name());
+        T modes = 1.0;
+        int l = 2;
+        T h = 1.0;
+        printf("MMS convergence test\n");
+        {
+                S tmp;
+                printf("Solver: %s \n", tmp.name());
+        }
         printf("Refinement \t Iterations \t Residual \t Error \t\t Rate \n");
-        SolverOptions opts;
-        opts.max_iterations = -1;
-        opts.eps = 1e-8;
-        opts.mms = 1;
         for (int i = 0; i < num_grids; ++i) {
-                n = 2 * (n - 1) + 1;
-                h = h / 2;
-                SolverOutput out = test_gauss_seidel<T, F>(n, h, modes, opts);
+                P problem(l, h, modes);
+                S solver(problem);
+                SolverOutput out = solve(solver, problem, opts);
                 rate = log2(err1 / out.error);
                 printf("%-7d \t %-7d \t %-5.5g \t %-5.5g \t %-5.5g \n", i,
                        out.iterations, out.residual, out.error, rate);
                 err1 = out.error;
+                l++;
+                h /= 2;
         }
-
 }
 
-template <typename T, typename F>
-SolverOutput test_multigrid(const int l, SolverOptions opts) {
-        int n = (1 << l) + 1;
-        printf("Problem size: %d x %d \n", n, n);
-        size_t num_bytes = sizeof(T) * n * n;
-        T modes = 1.0;
-        T h = 1.0 / (n - 1);
-        T *u = (T*)malloc(num_bytes);
-        T *f = (T*)malloc(num_bytes);
-        T *r = (T*)malloc(num_bytes);
-        memset(u, 0, num_bytes);
-        memset(f, 0, num_bytes);
-        memset(r, 0, num_bytes);
-
-        forcing_function(f, n, h, modes);
-        T fnorm = grid_l1norm(f, n, n, h) * h * h; 
-        Multigrid<T> mg(l);
-
-        F solver;
-
-        //forcing_function(u, n, h, modes);
-
-        //printf("f \n");
-        //grid_print(f, n, n);
-
-        if (opts.verbose) {
-                printf("Solver: %s \n", solver.name());
-                printf("h^2|f|_1 = %g, eps = %g, eps h^2|f|_1 = %g \n", fnorm, opts.eps, opts.eps * fnorm);
-                printf("Iteration \t Residual\n");
-        }
-        
-        T res = 0.0;
-        int iter = 0;
-        do {
-                mg(solver, u, f, h);
-                residual(r, u, f, n, h);
-                res = grid_l1norm(r, n, n, h);
-                iter++;
-                if (iter % opts.info == 0 && opts.verbose)
-                printf("%-7d \t %-7.7g \n", iter, res);
-
-        } while (res > opts.eps * fnorm && (iter < opts.max_iterations || opts.max_iterations < 0));
-
-        SolverOutput out;
-        out.iterations = iter;
-        out.residual = res;
-
-        if (opts.mms) {
-                T *v = (T*)malloc(num_bytes);
-                memset(v, 0, num_bytes);
-                exact_solution(v, n, h, modes);
-                grid_subtract(r, u, v, n, n);
-                out.error = grid_l1norm(r, n, n, h);
-                free(v);
-        }
-
-        free(u);
-        free(f);
-        free(r);
-
-        return out;
-
-}
 
 int main(int argc, char **argv) {
 
+        using Number = double;
         SolverOptions opts;
         opts.verbose = 1;
-        opts.info = 100;
-        opts.max_iterations = 10000;
-        opts.eps = 1e-4;
-        int l = 8;
+        opts.info = 1;
+        opts.max_iterations = 20;//e4;
+        opts.eps = 1e-8;
+        opts.mms = 1;
+        int l = 10;
         int n = (1 << l) + 1;
         double h = 1.0 / (n - 1);
-        //{
-        //auto out = test_gauss_seidel<double, GaussSeidelRedBlack>(n, h, 1.0,  opts);
-        //printf("Iterations: %d \n", out.iterations);
-        //}
+        double modes = 1.0;
+        using Problem = Poisson<Number>;
+
+        {
+                Problem problem(l, h, modes);
+                using Smoother=GaussSeidelRedBlack;
+                using MG=Multigrid<Smoother, Problem, Number>;
+                MG mg(problem);
+                auto out = solve(mg, problem, opts);
+                printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+
+                opts.verbose = 0;
+                convergence_test<MG, Problem>(10, opts);
+        }
 
         //{
-        //auto out = test_multigrid<double, GaussSeidel>(l, opts);
-        //printf("Iterations: %d \n", out.iterations);
+        //opts.verbose = 1;
+        //Problem problem(7, h, modes);
+        //GaussSeidel gs;
+        //auto out = solve(gs, problem, opts);
+        //printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
         //}
-        //test_gauss_seidel<double, GaussSeidel>((1 << 5) + 1, 1.0, 1.0, opts);
-        //test_gauss_seidel<double, GaussSeidel>(100, 1.0, 1.0, opts);
-        //test_gauss_seidel<double, GaussSeidelRedBlack>(100, 1.0, 1.0, opts);
-
-        convergence_test<double, GaussSeidel>(3);
-        //convergence_test<double, GaussSeidelRedBlack>(3);
+        //convergence_test<GaussSeidel, Problem, Number>(problem, 3, opts);
+        //convergence_test<double, GaussSeidelRedBlack>(5, opts);
 
 }

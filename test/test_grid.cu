@@ -39,8 +39,9 @@ void restriction(const char *axis, const T *xc, T *yc, T *zc, const int nxc,
         grid_restrict(yc, nxc, nyc, xf, nxf, nyf);
         grid_subtract(zc, xc, yc, nxc, nyc);
 
-        T l1_err = grid_l1norm(zc, nxc, nyc, hc);
-        T l2_err = grid_l2norm(zc, nxc, nyc, hc);
+
+        T l1_err = grid_l1norm(zc, nxc, nyc, hc, 1, nxc - 1, 1, nyc - 1);
+        T l2_err = grid_l2norm(zc, nxc, nyc, hc, 1, nxc - 1, 1, nyc - 1);
 
         approx(l1_err, 0.0);
         approx(l2_err, 0.0);
@@ -96,8 +97,6 @@ int test_restriction_prolongation(const int nxc, const int nyc, const T hc) {
         grid_y(xc, nxc, nyc, hc);
         restriction("y", xc, yc, zc, nxc, nyc, hc, xf, nxf, nyf, hf);
         prolongation("y", xf, yf, zf, nxf, nyf, hf, xc, nxc, nyc, hc);
-
-
 
         free(xf);
         free(yf);
