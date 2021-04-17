@@ -13,9 +13,9 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O4 -g -use_fast_math -Xcompiler -fope
 #find_package(MPI REQUIRED)
 include_directories(src)
 include_directories(test)
+include(CTest)
+enable_testing()
 
 add_subdirectory(test)
 
-include(CTest)
-enable_testing()
 
