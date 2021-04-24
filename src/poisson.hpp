@@ -128,6 +128,16 @@ void multigrid_v_cycle(const int l, S& smoother, T *u, T *f, T *r, T *v, T *w, c
         smoother(u, f, nu, h);
 }
 
+// Size of all of the combined grids
+size_t multigrid_size(const int l) {
+        size_t size = 0;
+        for (int i = 0; i <= l; ++i) {
+                int n = (1 << i) + 1;
+                size += n * n;
+        }
+        return size;
+}
+
 template <typename F, typename P, typename T>
 class Multigrid {
         private:
@@ -142,16 +152,11 @@ class Multigrid {
 
                 Multigrid() { }
                 Multigrid(P& p) : l(p.l) {
-                        for (int i = 0; i <= l; ++i) {
-                                int n = (1 << i) + 1;
-                                num_bytes +=sizeof(T) * n * n;
-                        }
+                        num_bytes = multigrid_size(l) * sizeof(T);
                         v = (T*)malloc(num_bytes);
                         w = (T*)malloc(num_bytes);
-
                         int n = (1 << p.l) + 1;
                         r = (T*)malloc(sizeof(T) * n * n);
-
                 }
 
                 void operator()(P& p) {

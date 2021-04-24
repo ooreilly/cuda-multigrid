@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include <poisson.hpp>
+#include <poisson.cuh>
 #include <assertions.hpp>
 #include <grid.hpp>
 #include <solver.hpp>
@@ -39,7 +40,7 @@ int main(int argc, char **argv) {
         SolverOptions opts;
         opts.verbose = 1;
         opts.info = 1;
-        opts.max_iterations = 20;//e4;
+        opts.max_iterations = 1e4;
         opts.eps = 1e-8;
         opts.mms = 1;
         int l = 4;
@@ -48,26 +49,38 @@ int main(int argc, char **argv) {
         double modes = 1.0;
         using Problem = Poisson<Number>;
 
+        //{
+        //        Problem problem(l, h, modes);
+        //        using Smoother=GaussSeidelRedBlack;
+        //        using MG=Multigrid<Smoother, Problem, Number>;
+        //        MG mg(problem);
+        //        auto out = solve(mg, problem, opts);
+        //        printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+
+        //        opts.verbose = 0;
+        //        int num_refinements = 10;
+        //        convergence_test<MG, Problem>(num_refinements, opts);
+        //}
         {
+
+                using Problem = Poisson<Number>;
                 Problem problem(l, h, modes);
                 using Smoother=GaussSeidelRedBlack;
-                using MG=Multigrid<Smoother, Problem, Number>;
-                MG mg(problem);
-                auto out = solve(mg, problem, opts);
+                Smoother solver;
+                auto out = solve(solver, problem, opts);
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
 
-                opts.verbose = 0;
-                convergence_test<MG, Problem>(10, opts);
         }
 
-        //{
-        //opts.verbose = 1;
-        //Problem problem(7, h, modes);
-        //GaussSeidel gs;
-        //auto out = solve(gs, problem, opts);
-        //printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
-        //}
-        //convergence_test<GaussSeidel, Problem, Number>(problem, 3, opts);
-        //convergence_test<double, GaussSeidelRedBlack>(5, opts);
+        {
+
+                using CUDAProblem = CUDAPoisson<Number>;
+                CUDAProblem problem(l, h, modes);
+                using Smoother=CUDAGaussSeidelRedBlack;
+                Smoother solver;
+                auto out = solve(solver, problem, opts);
+                printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+
+        }
 
 }
