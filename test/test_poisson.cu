@@ -19,14 +19,26 @@ void convergence_test(const int num_grids, SolverOptions opts) {
                 S tmp;
                 printf("Solver: %s \n", tmp.name());
         }
-        printf("Refinement \t Iterations \t Residual \t Error \t\t Rate \n");
+        printf("Grid Size \t Iterations \t Time (ms) \t Residual \t Error \t\t Rate \n");
         for (int i = 0; i < num_grids; ++i) {
+                cudaEvent_t start, stop;
+                cudaEventCreate(&start);
+                cudaEventCreate(&stop);
                 P problem(l, h, modes);
                 S solver(problem);
+
+                cudaEventRecord(start);
                 SolverOutput out = solve(solver, problem, opts);
+                cudaEventRecord(stop);
+                cudaEventSynchronize(stop);
+                float elapsed = 0;
+                cudaEventElapsedTime(&elapsed, start, stop);
+
                 rate = log2(err1 / out.error);
-                printf("%-7d \t %-7d \t %-5.5g \t %-5.5g \t %-5.5g \n", i,
-                       out.iterations, out.residual, out.error, rate);
+                int n = (1 << l) + 1;
+                printf("%4d x %-4d \t %-7d \t %-5.5f \t %-5.5g \t %-5.5g \t %-5.5f \n", 
+                       n + 1, n + 1,
+                       out.iterations, elapsed, out.residual, out.error, rate);
                 err1 = out.error;
                 l++;
                 h /= 2;
@@ -69,9 +81,6 @@ int main(int argc, char **argv) {
                 auto out = solve(mg, problem, opts);
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
 
-                //opts.verbose = 0;
-                //int num_refinements = 10;
-                //convergence_test<MG, Problem>(num_refinements, opts);
         }      
 
         {
@@ -93,5 +102,23 @@ int main(int argc, char **argv) {
                 CUDAMG solver(problem);
                 auto out = solve(solver, problem, opts);
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+        }
+
+        {
+                using Smoother=GaussSeidelRedBlack;
+                using MG=Multigrid<Smoother, Problem, Number>;
+                opts.verbose = 0;
+                
+                int num_refinements = 12;
+                convergence_test<MG, Problem>(num_refinements, opts);
+        }
+        {
+                using CUDAProblem = CUDAPoisson<L1NORM, Number>;
+                using CUDASmoother = CUDAGaussSeidelRedBlack;
+                using CUDAMG = CUDAMultigrid<CUDASmoother, CUDAProblem, Number>;
+                
+                opts.verbose = 0;
+                int num_refinements = 12;
+                convergence_test<CUDAMG, CUDAProblem>(num_refinements, opts);
         }
 }

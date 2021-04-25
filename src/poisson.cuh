@@ -25,6 +25,7 @@ void cuda_gauss_seidel_red_black(T *u, const T *f, const int n, const T h) {
 
         dim3 threads (32, 4, 1);
         dim3 blocks ( (n - 1) / threads.x + 1, (n - 1) / threads.y  + 1, 1);
+        //TODO: Rewrite kernels so that we only access memory once
         cuda_gauss_seidel_red_black_kernel<T><<<blocks, threads>>>(u, f, n, h, 0);
         cuda_gauss_seidel_red_black_kernel<T><<<blocks, threads>>>(u, f, n, h, 1);
         CUDACHECK(cudaGetLastError());
