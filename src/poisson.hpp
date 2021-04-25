@@ -247,7 +247,7 @@ class Poisson {
                 memset(v, 0, num_bytes);
                 exact_solution(v, n, h, modes);
                 grid_subtract(r, u, v, n, n);
-                T err = grid_l1norm(r, n, n, h);
+                T err = grid_l1norm(r, n, n, h, h);
                 free(v);
                 return err;
         }
@@ -257,7 +257,7 @@ class Poisson {
         }
 
         T norm(void) {
-                return grid_l1norm(r, n, n, h);
+                return grid_l1norm(r, n, n, h, h);
         }
 
         ~Poisson() {

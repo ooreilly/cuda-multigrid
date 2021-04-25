@@ -1,24 +1,17 @@
 #pragma once
 
-#include "definitions.cuh"
+#include <grid.cuh>
+#include <definitions.cuh>
 
-__device__ __inline__ bool inbounds(const int i, const int j, const int n,
-                                    const int i0, const int j0, const int in,
-                                    const int jn) {
-
-        if (i < i0 || j < j0) return false; 
-        if (i > n - 1 - in || j > n - 1 - jn) return false; 
-        return true;
-}
 
 template <typename T>
 __global__ void cuda_gauss_seidel_red_black_kernel(
-    T *u, const T *f, const int n, const T h, const int color, const int i0 = 1,
-    const int j0 = 1, const int in = 1, const int jn = 1) {
+    T *u, const T *f, const int n, const T h, const int color, const int ix0 = 1,
+    const int iy0 = 1, const int ixn = 1, const int iyn = 1) {
         int i = threadIdx.y + blockDim.y * blockIdx.y;
         int j = threadIdx.x + blockDim.x * blockIdx.x;
 
-        if (!inbounds(i, j, n, i0, j0, in, jn)) return;
+        if (!inbounds(j, i, n, n, ix0, iy0, ixn, iyn)) return;
 
         if ((i + j) % 2 != color) return;
 
@@ -34,18 +27,18 @@ void cuda_gauss_seidel_red_black(T *u, const T *f, const int n, const T h) {
         dim3 blocks ( (n - 1) / threads.x + 1, (n - 1) / threads.y  + 1, 1);
         cuda_gauss_seidel_red_black_kernel<T><<<blocks, threads>>>(u, f, n, h, 0);
         cuda_gauss_seidel_red_black_kernel<T><<<blocks, threads>>>(u, f, n, h, 1);
+        CUDACHECK(cudaGetLastError());
 }
 
 template <typename T>
 __global__ void cuda_poisson_residual_kernel(T *r, const T *u, const T *f,
                                              const int n, const T h,
-                                             const int i0 = 1, const int j0 = 1,
-                                             const int in = 1,
-                                             const int jn = 1) {
+                                             const int ix0 = 1, const int iy0 = 1,
+                                             const int ixn = 1, const int jxn = 1) {
         int i = threadIdx.y + blockDim.y * blockIdx.y;
         int j = threadIdx.x + blockDim.x * blockIdx.x;
         
-        if (!inbounds(i, j, n, i0, j0, in, jn)) return;
+        if (!inbounds(j, i, n, n, ix0, iy0, ixn, ixn)) return;
 
         T hi2 = 1.0 / (h * h);
         r[j + i * n] =
@@ -60,6 +53,7 @@ void cuda_poisson_residual(T *r, const T *u, const T *f, const int n, const T h)
         dim3 threads (32, 4, 1);
         dim3 blocks ( (n - 1) / threads.x + 1, (n - 1) / threads.y  + 1, 1);
         cuda_poisson_residual_kernel<T><<<blocks, threads>>>(r, u, f, n, h);
+        CUDACHECK(cudaGetLastError());
 }
 
 class CUDAGaussSeidelRedBlack {
@@ -125,7 +119,7 @@ class CUDAPoisson {
                 cudaMemcpy(hr, r, num_bytes, cudaMemcpyDeviceToHost);
                 cudaMemcpy(hu, u, num_bytes, cudaMemcpyDeviceToHost);
                 grid_subtract(hr, hu, v, n, n);
-                T err = grid_l1norm(hr, n, n, h);
+                T err = grid_l1norm(hr, n, n, h, h);
                 free(v);
                 return err;
         }
@@ -133,7 +127,7 @@ class CUDAPoisson {
         T norm(void) {
                 T *hr = (T*)malloc(num_bytes);
                 cudaMemcpy(hr, r, num_bytes, cudaMemcpyDeviceToHost);
-                T r_norm = grid_l1norm(hr, n, n, h);
+                T r_norm = grid_l1norm(hr, n, n, h, h);
                 free(hr);
 
                 return r_norm;

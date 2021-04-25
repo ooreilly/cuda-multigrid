@@ -19,8 +19,10 @@ void grid_y(T *y, const int nx, const int ny, const T h) {
         }
 }
 
-template<typename T>
-void grid_restrict(T *yc, const int nxc, const int nyc, const T *xf, const int nxf, const int nyf, const T a = 0.0, const T b=1.0) {
+template <typename T>
+void grid_restrict(T *yc, const int nxc, const int nyc, const T *xf,
+                   const int nxf, const int nyf, const T a = 0.0,
+                   const T b = 1.0) {
         assert(nxf == 2 * (nxc - 1) + 1);
         const T c0 = 0.25;
         const T c1 = 0.5;
@@ -45,8 +47,10 @@ void grid_restrict(T *yc, const int nxc, const int nyc, const T *xf, const int n
         }
 }
 
-template<typename T>
-void grid_prolongate(T *yf, const int nxf, const int nyf, const T *xc, const int nxc, const int nyc, const T a=0.0, const T b=1.0) {
+template <typename T>
+void grid_prolongate(T *yf, const int nxf, const int nyf, const T *xc,
+                     const int nxc, const int nyc, const T a = 0.0,
+                     const T b = 1.0) {
         assert(nxf == 2 * (nxc - 1) + 1);
 
         for (int i = 0; i < nyc; ++i) {
@@ -82,26 +86,26 @@ void grid_subtract(T *z, const T *x, const T *y, const int nx, const int ny) {
                 z[i] = x[i] - y[i];
 }
 
-template<typename T>
-double grid_l1norm(const T *x, const int nx, const int ny, const T h, const int bx=0, const int ex=-1, const int by=0, const int ey=-1) {
-        int enx = ex == -1 ? nx : ex;
-        int eny = ey == -1 ? ny : ey;
+template <typename T>
+double grid_l1norm(const T *x, const int nx, const int ny, const T hx,
+                   const T hy, const int bx = 0, const int by = 0,
+                   const int ex = 0, const int ey = 0) {
         double out = 0.0;
-        for (int i = by; i < eny; ++i) 
-                for (int j = bx; j < enx; ++j) 
-                        out += fabs(x[j + nx * i]) * h * h;
+        for (int i = by; i < ny - ey; ++i) 
+                for (int j = bx; j < nx - ex; ++j) 
+                        out += fabs(x[j + nx * i]) * hx * hy;
         return out;
 }
 
-template<typename T>
-double grid_l2norm(const T *x, const int nx, const int ny, const T h, const int bx=0, const int ex=-1, const int by=0, const int ey=-1) {
-        int enx = ex == -1 ? nx : ex;
-        int eny = ey == -1 ? ny : ey;
+template <typename T>
+double grid_l2norm(const T *x, const int nx, const int ny, const T hx,
+                   const T hy, const int bx = 0, const int by = 0,
+                   const int ex = 0, const int ey = 0) {
         double out = 0.0;
-        for (int i = by; i < eny; ++i) 
-                for (int j = bx; j < enx; ++j) 
-                        out += fabs(x[j + nx * i]) * h * h;
-        return out;
+        for (int i = by; i < ny - ey; ++i) 
+                for (int j = bx; j < nx - ex; ++j) 
+                        out += x[j + nx * i] * x[j + nx * i];
+        return out * hx * hy;
 }
 
 template <typename T>
