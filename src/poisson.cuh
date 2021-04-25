@@ -75,6 +75,84 @@ void cuda_poisson_residual(T *r, const T *u, const T *f, const int n, const T h)
         CUDACHECK(cudaGetLastError());
 }
 
+template <typename T>
+__global__ void cuda_base_case_kernel(T *u, const T *f, const T h) {
+        u[1 + 3 * 1] = -0.5 * f[1 + 3 * 1] * h * h;
+}
+
+template <typename T>
+void cuda_base_case(T *u, const T *f, const T h) {
+        dim3 threads (1, 1, 1);
+        dim3 blocks (1, 1, 1);
+        cuda_base_case_kernel<T><<<blocks, threads>>>(u, f, h);
+        CUDACHECK(cudaGetLastError());
+}
+
+template <typename T, typename S>
+void cuda_multigrid_v_cycle(const int l, S& smoother, T *u, T *f, T *r, T *v, T *w, const T h) {
+
+        if (l == 1) {
+                cuda_base_case(u, f, h);
+                return;
+        }
+
+        int nu = (1 << l) + 1; 
+        int nv = (1 << (l - 1)) + 1;
+        
+        T *el = &v[nv * nv];
+        T *rl = &w[nv * nv];
+
+        smoother(u, f, nu, h);
+
+        cuda_poisson_residual(r, u, f, nu, h);
+
+        cuda_grid_restrict(rl, nv, nv, r, nu, nu, 0.0, 1.0);
+
+        cuda_multigrid_v_cycle(l - 1, smoother, el, rl, r, v, w, 2 * h); 
+
+        cuda_grid_prolongate(u, nu, nu, el, nv, nv, 1.0, 1.0);
+
+        smoother(u, f, nu, h);
+}
+
+template <typename F, typename P, typename T>
+class CUDAMultigrid {
+        private:
+                T *v = 0, *w = 0, *r = 0;
+                int l;
+                size_t num_bytes = 0;
+                F smoother;
+        public:
+
+                CUDAMultigrid() { }
+                CUDAMultigrid(P& p) : l(p.l) {
+                        num_bytes = multigrid_size(l) * sizeof(T);
+                        CUDACHECK(cudaMalloc((void**)&v, num_bytes));
+                        CUDACHECK(cudaMalloc((void**)&w, num_bytes));
+                        int n = (1 << p.l) + 1;
+                        CUDACHECK(cudaMalloc((void**)&r, sizeof(T) * n * n));
+                }
+
+                void operator()(P& p) {
+                        CUDACHECK(cudaMemset(v, 0, num_bytes));
+                        CUDACHECK(cudaMemset(w, 0, num_bytes));
+                        cuda_multigrid_v_cycle<T, F>(l, smoother, p.u, p.f, r, v, w, p.h);
+                }
+
+                ~CUDAMultigrid(void) {
+                        if (v != nullptr) CUDACHECK(cudaFree(v));
+                        if (w != nullptr) CUDACHECK(cudaFree(w));
+                        if (r != nullptr) CUDACHECK(cudaFree(r));
+                }
+
+                const char *name() {
+                        static char name[2048];
+                        sprintf(name, "CUDA Multi-Grid<%s>", smoother.name());
+                        return name;
+                }
+
+};
+
 class CUDAGaussSeidelRedBlack {
         public:
                 CUDAGaussSeidelRedBlack() { }

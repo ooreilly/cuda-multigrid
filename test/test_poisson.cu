@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
         using Number = double;
         SolverOptions opts;
         opts.verbose = 1;
-        opts.info = 1;
+        opts.info = 10;
         opts.max_iterations = 1e4;
         opts.eps = 1e-8;
         opts.mms = 1;
@@ -49,18 +49,7 @@ int main(int argc, char **argv) {
         double modes = 1.0;
         using Problem = Poisson<Number>;
 
-        //{
-        //        Problem problem(l, h, modes);
-        //        using Smoother=GaussSeidelRedBlack;
-        //        using MG=Multigrid<Smoother, Problem, Number>;
-        //        MG mg(problem);
-        //        auto out = solve(mg, problem, opts);
-        //        printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
-
-        //        opts.verbose = 0;
-        //        int num_refinements = 10;
-        //        convergence_test<MG, Problem>(num_refinements, opts);
-        //}
+    
         {
 
                 using Problem = Poisson<Number>;
@@ -71,14 +60,38 @@ int main(int argc, char **argv) {
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
 
         }
+        
+        {
+                Problem problem(l, h, modes);
+                using Smoother=GaussSeidelRedBlack;
+                using MG=Multigrid<Smoother, Problem, Number>;
+                MG mg(problem);
+                auto out = solve(mg, problem, opts);
+                printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+
+                //opts.verbose = 0;
+                //int num_refinements = 10;
+                //convergence_test<MG, Problem>(num_refinements, opts);
+        }      
 
         {
                 using CUDAProblem = CUDAPoisson<L1NORM, Number>;
                 CUDAProblem problem(l, h, modes);
-                using Smoother=CUDAGaussSeidelRedBlack;
-                Smoother solver;
+                using CUDASmoother = CUDAGaussSeidelRedBlack;
+
+                CUDASmoother solver;
                 auto out = solve(solver, problem, opts);
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
         }
 
+        {
+                using CUDAProblem = CUDAPoisson<L1NORM, Number>;
+                using CUDASmoother = CUDAGaussSeidelRedBlack;
+                using CUDAMG = CUDAMultigrid<CUDASmoother, CUDAProblem, Number>;
+                
+                CUDAProblem problem(l, h, modes);
+                CUDAMG solver(problem);
+                auto out = solve(solver, problem, opts);
+                printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
+        }
 }

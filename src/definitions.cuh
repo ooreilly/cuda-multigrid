@@ -1,7 +1,6 @@
 #pragma once
 #define CUDACHECK(call) cudacheck_impl(call, __FILE__, __LINE__, __func__)
 
-
 void cudacheck_impl(cudaError_t err, const char *file, const int line,
                     const char *func) {
         if (cudaSuccess != err) {
