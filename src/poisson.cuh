@@ -49,6 +49,25 @@ __global__ void cuda_poisson_residual_kernel(T *r, const T *u, const T *f,
 }
 
 template <typename T>
+__global__ void cuda_exact_solution_kernel(T *u, const int n, const T h, const T modes=1.0,
+                const int bx=0, const int by=0, const int ex=0, const int ey=0) {
+        int i = threadIdx.y + blockDim.y * blockIdx.y;
+        int j = threadIdx.x + blockDim.x * blockIdx.x;
+        if (!inbounds(j, i, n, n, bx, by, ex, ey)) return;
+
+        T s = 2.0 * M_PI * modes / (h * (n - 1));
+        u[j + n * i] = sin(s * h * j) * sin(s * h * i);
+
+}
+template <typename T>
+void cuda_exact_solution(T *u, const int n, const T h, const T modes=1.0) {
+        dim3 threads (32, 4, 1);
+        dim3 blocks ( (n - 1) / threads.x + 1, (n - 1) / threads.y  + 1, 1);
+        cuda_exact_solution_kernel<T><<<blocks, threads>>>(u, n, h);
+        CUDACHECK(cudaGetLastError());
+}
+
+template <typename T>
 void cuda_poisson_residual(T *r, const T *u, const T *f, const int n, const T h) {
         dim3 threads (32, 4, 1);
         dim3 blocks ( (n - 1) / threads.x + 1, (n - 1) / threads.y  + 1, 1);
@@ -77,7 +96,7 @@ class CUDAGaussSeidelRedBlack {
 
 };
 
-template <typename T>
+template <enum norm_type normt=L1NORM, typename T=double>
 class CUDAPoisson {
 
         public:
@@ -87,6 +106,7 @@ class CUDAPoisson {
                 T modes;
                 T *u, *f, *r;
                 size_t num_bytes;
+                CUDANorm<normt> normfcn;
 
         CUDAPoisson(int l, T h, T modes) : l(l), h(h), modes(modes) {
                 l = l;
@@ -111,25 +131,19 @@ class CUDAPoisson {
         }
 
         T error(void) {
-                T *v = (T*)malloc(num_bytes);
-                T *hr = (T*)malloc(num_bytes);
-                T *hu = (T*)malloc(num_bytes);
-                memset(v, 0, num_bytes);
-                exact_solution(v, n, h, modes);
-                cudaMemcpy(hr, r, num_bytes, cudaMemcpyDeviceToHost);
-                cudaMemcpy(hu, u, num_bytes, cudaMemcpyDeviceToHost);
-                grid_subtract(hr, hu, v, n, n);
-                T err = grid_l1norm(hr, n, n, h, h);
-                free(v);
+                T *v;
+                CUDACHECK(cudaMalloc((void**)&v, num_bytes));
+                CUDACHECK(cudaMemset(v, 0, num_bytes));
+                cuda_exact_solution(v, n, h, modes);
+                cuda_grid_subtract(r, u, v, n, n);
+                T err = 0.0;
+                err = normfcn(r, n, n, h, h);
+                CUDACHECK(cudaFree(v));
                 return err;
         }
 
         T norm(void) {
-                T *hr = (T*)malloc(num_bytes);
-                cudaMemcpy(hr, r, num_bytes, cudaMemcpyDeviceToHost);
-                T r_norm = grid_l1norm(hr, n, n, h, h);
-                free(hr);
-
+                T r_norm = normfcn(r, n, n, h, h);
                 return r_norm;
         }
 

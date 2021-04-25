@@ -73,14 +73,12 @@ int main(int argc, char **argv) {
         }
 
         {
-
-                using CUDAProblem = CUDAPoisson<Number>;
+                using CUDAProblem = CUDAPoisson<L1NORM, Number>;
                 CUDAProblem problem(l, h, modes);
                 using Smoother=CUDAGaussSeidelRedBlack;
                 Smoother solver;
                 auto out = solve(solver, problem, opts);
                 printf("Iterations: %d, Residual: %g \n", out.iterations, out.residual);
-
         }
 
 }
