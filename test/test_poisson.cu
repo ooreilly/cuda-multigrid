@@ -37,7 +37,7 @@ void convergence_test(const int num_grids, SolverOptions opts) {
                 rate = log2(err1 / out.error);
                 int n = (1 << l) + 1;
                 printf("%4d x %-4d \t %-7d \t %-5.5f \t %-5.5g \t %-5.5g \t %-5.5f \n", 
-                       n + 1, n + 1,
+                       n, n,
                        out.iterations, elapsed, out.residual, out.error, rate);
                 err1 = out.error;
                 l++;
